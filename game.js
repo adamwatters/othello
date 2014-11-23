@@ -10,12 +10,19 @@
 
 		this.stateController = new StateController;
 
+		this.score = {white: 2, black: 2};
+
 		var SIZE = 600;
 		gameCanvas.height = SIZE;
 		gameCanvas.width = SIZE;
-		this.size = SIZE
 
+		panelCanvas.height = SIZE;
+		panelCanvas.width = 240;
+		this.panelWidth = 240;
+		
+		this.size = SIZE
 		this.drawTools = gameCanvas.getContext('2d');
+		this.drawToolsPanel = panelCanvas.getContext('2d');
 		this.board = new Board(this.size);
 		this.draw();
 	};
@@ -31,6 +38,23 @@
 					}
 				}
 			}
+			this.renderPanel();
+		},
+
+		updateScore: function(){
+			this.score = {white: 0, black: 0};
+			for (var i = 0; i < this.board.spaces.length; i++) {
+				for (var j = 0; j < this.board.spaces[i].length; j ++) {
+					if (this.board.spaces[i][j].contents) {
+						if (this.board.spaces[i][j].contents.state === true) {
+							this.score.white ++
+						} else if (this.board.spaces[i][j].contents.state === false) {
+							this.score.black ++
+						}
+					}
+
+				}
+			}
 		},
 
 		computeCoordinatesClicked: function(pixelDistanceX, pixelDistanceY) {
@@ -43,30 +67,81 @@
 			var coordinatesClicked = self.computeCoordinatesClicked(clickX, clickY);
 			var spaceClicked = self.board.spaces[coordinatesClicked.x][coordinatesClicked.y];
 			var turn = self.stateController.turn;
-			spaceClicked.placePiece(turn);
-			self.findMoveVectors(coordinatesClicked, turn);
-			self.draw();
-			self.stateController.changeTurns();
+			if (!spaceClicked.contents && 
+				self.validMove(coordinatesClicked, turn)){
+					spaceClicked.placePiece(turn);
+					self.flipPieces(coordinatesClicked, turn);
+					self.updateScore();
+					self.stateController.changeTurns();
+					self.draw();
+			}
 		},
 
 		panelClickHandler: function(clickX, clickY, self) {
 			console.log(clickX, clickY);
 		},
 
-		doMoveResults: function(space, state) {
-			
+		flipPieces: function(coordinates, state) {
+			var piecesToFlip = this.searchForFlips(coordinates, state);
+			if (piecesToFlip.length === 0) {
+				return false;	
+			}; 
+			for (var i = 0; i < piecesToFlip.length; i ++) {
+				piecesToFlip[i].flip();
+			};
+			return true;
 		},
 
-		findMoveVectors: function(coordinates, state) {
-			if(coordinates.x + 1 > this.board.spaces.length) {
-				return;
+		validMove: function(coordinates, state) {
+			var flipArray = this.searchForFlips(coordinates, state);
+			return flipArray.length ? true : false;
+		},
+
+		searchForFlips: function(coordinates, state) {
+			var moveArrays = this.findMoveArrays(coordinates,state); 
+			var flipArray = [];
+			for (var i = 0; i < moveArrays.length; i++) {
+				var j = 0;
+				var helperArray = [];
+				while(moveArrays[i][j] &&
+					moveArrays[i][j].state !== state) {
+						helperArray.push(moveArrays[i][j]);
+						j += 1;
+				};
+				if (moveArrays[i][j] && 
+					moveArrays[i][j].state === state){
+				 		flipArray = flipArray.concat(helperArray);
+				}
 			}
-			var current = this.board.spaces[coordinates.x][coordinates.y].contents;
-			var neighbor = this.board.spaces[coordinates.x + 1][coordinates.y].contents;
-			if (current.state !== neighbor.state){
-				neighbor.flip();
-				this.findMoveVectors({x: coordinates.x + 1,y:coordinates.y});
+			return flipArray;
+		},
+
+		findMoveArrays: function(coordinates, state) {
+			var moveArrays = [];
+			moveArrays.push(this.findMoveArray(coordinates, state, 1, 0));
+			moveArrays.push(this.findMoveArray(coordinates, state, -1, 0));
+			moveArrays.push(this.findMoveArray(coordinates, state, 0, 1));
+			moveArrays.push(this.findMoveArray(coordinates, state, 0, -1));
+			moveArrays.push(this.findMoveArray(coordinates, state, 1, 1));
+			moveArrays.push(this.findMoveArray(coordinates, state, 1, -1));
+			moveArrays.push(this.findMoveArray(coordinates, state, -1, -1));
+			moveArrays.push(this.findMoveArray(coordinates, state, -1, 1));
+			return moveArrays;
+		},
+
+		findMoveArray: function(coordinates, state, dirX, dirY) {
+			var moveArray = [];
+			var i = dirX;
+			var j = dirY;
+			while(Math.abs(coordinates.x + i) < this.board.spaces[coordinates.x].length &&
+				Math.abs(coordinates.y + j) < this.board.spaces[coordinates.y].length &&
+				(coordinates.x + i) >= 0 &&
+				(coordinates.y + j) >= 0) {
+					moveArray.push(this.board.spaces[coordinates.x + i][coordinates.y + j].contents);
+					i = i + dirX;
+					j = j + dirY;
 			}
+			return moveArray;
 		},
 
 		renderSpace: function(space) {
@@ -93,17 +168,44 @@
 			this.drawTools.closePath();
 			this.drawTools.fill();
 
-		}
+		},
+
+		renderPanel: function() {
+			this.drawToolsPanel.fillStyle = "grey";
+			this.drawToolsPanel.fillRect(0, 0, this.panelWidth, this.size)
+
+			this.drawToolsPanel.fillStyle = this.stateController.turn ? "white" : "black";
+			this.drawToolsPanel.beginPath();
+			this.drawToolsPanel.arc(this.panelWidth / 2,
+									this.size /2,
+									50, 0, Math.PI * 2);
+			this.drawToolsPanel.closePath();
+			this.drawToolsPanel.fill();
+
+			this.drawToolsPanel.fillStyle = "black";
+			this.drawToolsPanel.font="40px Verdana";
+			this.drawToolsPanel.fillText("White: " + this.score.white,30, 50);
+			this.drawToolsPanel.fillText("Black: " + this.score.black,30, this.size - 20);
+		},
 	};
 
-	var StateController = function() {
+	var StateController = function(game) {
+		this.game = game;
 		this.turn = true;
 	};
 
 	StateController.prototype = {
 		changeTurns: function(){
 			this.turn = !this.turn;
-		}
+		},
+	};
+
+	var Panel = function() {
+
+	};
+
+	Panel.prototype = {
+
 	};
 
 	var Board = function(size) {
@@ -117,7 +219,7 @@
 			for (var i = 0; i < 8; i ++) {
 				spaces.push([]);
 				for (var j = 0; j < 8; j ++){
-					spaces[i].push(new Space(i, j, size, null));
+					spaces[i].push(new Space(i, j, size));
 				}
 			}
 			return spaces;
@@ -150,7 +252,7 @@
 		removePiece: function() {
 			var holder = this.contents;
 			this.contents.space = undefined;
-			this.contents = null;
+			this.contents;
 			return holder;
 		}
 	};
