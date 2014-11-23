@@ -3,7 +3,18 @@
 		var self = this;
 
 		var gameCanvas = document.getElementById("screen");
-		var panelCanvas = document.getElementById("control-panel");
+		var panelCanvas = document.getElementById("score-board");
+
+		var newGameButton = document.getElementById("reset");
+		var noMovesButton = document.getElementById("no-moves");
+
+		noMovesButton.addEventListener("click", function(){
+			self.skipTurn();
+		});
+
+		newGameButton.addEventListener("click", function(){
+			self.newGame();
+		});
 
 		var boardMouser = new Mouser(gameCanvas, this.boardClickHandler, self);
 		var panelMouser = new Mouser(panelCanvas, this.panelClickHandler, self);
@@ -28,6 +39,13 @@
 	};
 
 	Game.prototype = {
+
+		newGame: function(){
+			this.stateController.turn = true;
+			this.score = {white: 2, black: 2};
+			this.board = new Board(this.size);
+			this.draw();
+		},
 
 		draw: function() {
 			for (var i = 0; i < 8; i ++) {
@@ -55,6 +73,11 @@
 
 				}
 			}
+		},
+
+		skipTurn: function() {
+			this.stateController.changeTurns();
+			this.draw();
 		},
 
 		computeCoordinatesClicked: function(pixelDistanceX, pixelDistanceY) {
