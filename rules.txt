@@ -1,0 +1,2 @@
+1) pieces can be placed on unoccupied spaces
+2) all moves must result in a flip
